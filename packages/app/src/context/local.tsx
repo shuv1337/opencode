@@ -378,9 +378,13 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
       const relative = (path: string) => path.replace(sync.data.path.directory + "/", "")
 
+      const loading = new Map<string, Promise<void>>()
+
       const load = async (path: string) => {
         const relativePath = relative(path)
-        await sdk.client.file
+        const existing = loading.get(relativePath)
+        if (existing) return existing
+        const promise = sdk.client.file
           .read({ path: relativePath })
           .then((x) => {
             if (!store.node[relativePath]) return
@@ -400,6 +404,11 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
               description: e.message,
             })
           })
+          .finally(() => {
+            loading.delete(relativePath)
+          })
+        loading.set(relativePath, promise)
+        return promise
       }
 
       const fetch = async (path: string) => {
@@ -435,9 +444,13 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         return load(relativePath)
       }
 
+      const listing = new Map<string, Promise<void>>()
+
       const list = async (path: string) => {
         const listPath = path ? path + "/" : ""
-        return sdk.client.file
+        const existing = listing.get(listPath)
+        if (existing) return existing
+        const promise = sdk.client.file
           .list({ path: listPath })
           .then((x) => {
             setStore(
@@ -451,6 +464,11 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
             )
           })
           .catch(() => {})
+          .finally(() => {
+            listing.delete(listPath)
+          })
+        listing.set(listPath, promise)
+        return promise
       }
 
       const searchFiles = (query: string) => sdk.client.find.files({ query, dirs: "false" }).then((x) => x.data!)
